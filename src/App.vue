@@ -1,7 +1,10 @@
 <template>
   <div id="app">
-    <video ref="video"></video>
-    <canvas ref="canvas"></canvas>
+    <p>{{message}}</p>
+    <div class="contents">
+      <video ref="video"></video>
+      <canvas ref="canvas"></canvas>
+    </div>
   </div>
 </template>
 
@@ -13,29 +16,33 @@ export default {
   name: 'app',
   async mounted(){
     await this.videoInit()
+
+    this.message = 'model download ...'
     await this.yoloInit()
-    await this.loopRun()
+    this.message = 'webgl init ...'
+    await this.runYolo(this.$refs['video'])
+
+    this.message = 'now running!'
     console.log(tf.getBackend()) // eslint-disable-line no-console
-    setTimeout(()=>{
-      this.loopRun()
-    },50)
+
+    this.loopRun()
   },
   data(){
     return {
       yolo : null,
+      message : 'ready'
     }
   },
   methods: {
     async videoInit(){
       let constraints = {
         audio: false,
-        video: { width: 416, height: 416 }
+        video: true
       };
 
       let video = this.$refs['video'];
 
       let mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
-      console.log('mediaStream',mediaStream) // eslint-disable-line no-console
       video.srcObject = mediaStream;
       await new Promise((resolve)=>{
         video.onloadedmetadata = e => {
@@ -51,9 +58,11 @@ export default {
       return await this.yolo.predict(htmlElement)
     },
     renderCanvas(results){
-      console.log({results}) // eslint-disable-line no-console
+      const video = this.$refs['video'];
       const canvas = this.$refs['canvas'];
       const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
 
       ctx.clearRect(0,0,canvas.width,canvas.height);
       ctx.beginPath();
@@ -72,7 +81,8 @@ export default {
     async loopRun(){
       let results = await this.runYolo(this.$refs['video'])
       this.renderCanvas(results)
-      await this.loopRun()
+
+      setTimeout(()=>{ this.loopRun() },50)
     }
   }
 }
@@ -86,5 +96,14 @@ export default {
   text-align: center;
   color: #2c3e50;
   margin-top: 60px;
+}
+.contents {
+  position: relative;
+  display: inline-flex;
+}
+.contents canvas {
+  position: absolute;
+  left:0;
+  top:0;
 }
 </style>
