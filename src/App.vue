@@ -10,6 +10,7 @@
 
 <script>
 import tfjs_yolo from 'tfjs-yolo'
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as tf from '@tensorflow/tfjs'
 
 export default {
@@ -18,19 +19,29 @@ export default {
     await this.videoInit()
 
     this.message = 'model download ...'
-    await this.yoloInit()
+    //await this.yoloInit()
+    await this.cocoSsdInit()
     this.message = 'webgl init ...'
-    await this.runYolo(this.$refs['video'])
+    //await this.runYolo(this.$refs['video'])
+    await this.runCocoSsd(this.$refs['video'])
 
+    this.isReady = true
     this.message = 'now running!'
     console.log(tf.getBackend()) // eslint-disable-line no-console
+
+    this.run = ()=>{
+      return this.runCocoSsd(this.$refs['video'])
+    }
 
     this.loopRun()
   },
   data(){
     return {
+      isReady: false,
       yolo : null,
-      message : 'ready'
+      cocoSsd : null,
+      message : 'ready',
+      run : () => { return [] }
     }
   },
   methods: {
@@ -51,11 +62,31 @@ export default {
       })
       video.play();
     },
-    async yoloInit(){
+    async yoloV3Init(){
+      this.yolo = await tfjs_yolo.v3();
+    },
+    async yoloV3tinyInit(){
       this.yolo = await tfjs_yolo.v3tiny();
+    },
+    async cocoSsdInit(){
+      this.cocoSsd = await cocoSsd.load();
     },
     async runYolo(htmlElement){
       return await this.yolo.predict(htmlElement)
+    },
+    async runCocoSsd(htmlElement){
+      const predictions = await this.cocoSsd.detect(htmlElement);
+      let results = predictions.map(result=>{
+        let [left,top,width,height] = result.bbox
+        return {
+          ...result,
+          left,
+          top,
+          width,
+          height,
+        }
+      })
+      return results
     },
     renderCanvas(results){
       const video = this.$refs['video'];
@@ -79,7 +110,13 @@ export default {
       ctx.stroke();
     },
     async loopRun(){
-      let results = await this.runYolo(this.$refs['video'])
+      if(this.run==null){
+        this.run = () => []
+      }
+      if(this.isReady !== true){
+        return
+      }
+      let results = await this.run()
       this.renderCanvas(results)
 
       setTimeout(()=>{ this.loopRun() },50)
